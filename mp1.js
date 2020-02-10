@@ -1,4 +1,3 @@
-
 //
 // Initialize a shader program, so WebGL knows how to draw our data
 //
@@ -49,7 +48,7 @@ function loadShader(gl, type, source) {
   return shader;
 }
 
-function initBuffers(gl, vertices, colors) {
+function initBuffers(gl, vertices, colors, framenum) {
 
   // Create a buffer for the square's positions.
 
@@ -62,7 +61,8 @@ function initBuffers(gl, vertices, colors) {
 
   // Now create an array of positions for the square.
 
-  const positions = vertices;
+  var positions = vertices;
+  positions = deform_model(positions, framenum);
 
   // Now pass the list of positions into WebGL to build the
   // shape. We do this by creating a Float32Array from the
@@ -70,7 +70,7 @@ function initBuffers(gl, vertices, colors) {
 
   gl.bufferData(gl.ARRAY_BUFFER,
                 new Float32Array(positions),
-                gl.STATIC_DRAW);
+                gl.DYNAMIC_DRAW);
 
   let aVertexColorO = [1.0, 0.5, 0.0, 1.0];
   let aVertexColorB = [0.0353, 0.0, 0.529, 1.0];
@@ -105,17 +105,28 @@ function initBuffers(gl, vertices, colors) {
   };
 }
 
-function drawObject(gl, programInfo, buffers, num_verts) {
-  gl.enable(gl.DEPTH_TEST);           // Enable depth testing
-  gl.depthFunc(gl.LEQUAL);            // Near things obscure far things
+function animate_model(modelViewMatrix, framenum) {
+  mat4.fromRotation(modelViewMatrix, .01*framenum, [Math.sin(framenum*.001), Math.sin(framenum*.01), .7]);
+  mat4.scale(modelViewMatrix,  modelViewMatrix, [.3*Math.sin(framenum*.01)+.5,.3*Math.sin(framenum*.01)+.5,.3*Math.sin(framenum*.01)+.5]);
+
+  return modelViewMatrix;
+}
+
+function deform_model(vertices, framenum) {
+  for(i = 0; i < vertices.length; i++) {
+    vertices[i] = vertices[i] + (i%3)*(1/10)*Math.sin(framenum*.05);
+    i++;
+  }
+  return vertices;
+}
+
+function drawObject(gl, programInfo, buffers, num_verts, framenum) {
 
   // Set the drawing position to the "identity" point, which is
   // the center of the scene.
   const modelViewMatrix = mat4.create();
 
-  mat4.translate(modelViewMatrix, modelViewMatrix, [0.2,0,0]);
-
-
+  animate_model(modelViewMatrix, framenum);
 
   // Tell WebGL how to pull out the positions from the position
   // buffer into the vertexPosition attribute.
@@ -176,7 +187,7 @@ function scaleVertices(vertices, max_xy) {
   return vertices;
 }
 
-function drawLargeI(gl, programInfo) {
+function drawLargeI(gl, programInfo, framenum) {
   // Top box
   let vertices = [
     0,0, // cc
@@ -194,14 +205,15 @@ function drawLargeI(gl, programInfo) {
     20,25,
     0,25
   ];
+
   vertices = scaleVertices(vertices, 25); // Scale
-  console.log(vertices);
+  // console.log(vertices);
   // Build and draw buffer
-  let buffers = initBuffers(gl, vertices, 1);
-  drawObject(gl, programInfo, buffers, 14);
+  let buffers = initBuffers(gl, vertices, 1, framenum);
+  drawObject(gl, programInfo, buffers, 14, framenum);
 }
 
-function drawSmallI(gl, programInfo) {
+function drawSmallI(gl, programInfo, framenum) {
   // Top box
   let vertices = [
     1,1, // cc
@@ -219,12 +231,17 @@ function drawSmallI(gl, programInfo) {
     19,24,
     1,24
   ];
+
   vertices = scaleVertices(vertices, 25); // Scale
-  console.log(vertices);
+  // console.log(vertices);
   // Build and draw buffer
-  let buffers = initBuffers(gl, vertices, 0);
-  drawObject(gl, programInfo, buffers, 14);
+  let buffers = initBuffers(gl, vertices, 0, framenum);
+  drawObject(gl, programInfo, buffers, 14, framenum);
 }
+
+var framenum = 0;
+
+
 
 function main() {
   const canvas = document.querySelector("#glCanvas");
@@ -284,8 +301,14 @@ function main() {
   // Clear the color buffer with specified clear color
   gl.clear(gl.COLOR_BUFFER_BIT);
 
-  drawLargeI(gl, programInfo);
-  drawSmallI(gl, programInfo);
+  function animate() {
+    requestAnimationFrame(animate);
+    drawLargeI(gl, programInfo, framenum);
+    drawSmallI(gl, programInfo, framenum);
+    framenum+=1;
+  }
+
+  animate();
 
 }
 
