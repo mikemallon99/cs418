@@ -23,7 +23,7 @@
 
     void main(void) {
       // Set depth color values
-      vec3 depth0Color = vec3(0.0/255.0,0.0/255.0,255.0/255.0);
+      vec3 depth0Color = vec3(0.0/255.0,50.0/255.0,255.0/255.0);
       vec3 depth1Color = vec3(0.0/255.0,163.0/255.0,0.0/255.0);
       vec3 depth2Color = vec3(205.0/255.0,163.0/255.0,63.0/255.0);
       vec3 depth3Color = vec3(100.0/255.0,100.0/255.0,200.0/255.0);
@@ -38,9 +38,9 @@
       normalEye = normalEyeTemp;
 
       // Set the vertex color based on its depth
-      if (aVertexPosition.z < 0.0) diffuseColor = depth0Color;
-      else if (aVertexPosition.z < .07) diffuseColor = depth1Color;
-      else if (aVertexPosition.z < .15) diffuseColor = depth2Color;
+      if (aVertexPosition.z < -0.04) diffuseColor = depth0Color;
+      else if (aVertexPosition.z < 0.0) diffuseColor = depth1Color;
+      else if (aVertexPosition.z < .03) diffuseColor = depth2Color;
       else if (aVertexPosition.z <= .5) diffuseColor = depth3Color;
 
       gl_Position = uPMatrix*uMVMatrix*vec4(aVertexPosition, 1.0);
@@ -100,6 +100,7 @@ void main(void) {
 <script src="gl-matrix-min.js"></script>
 <script src="webgl-utils.js"></script>
 <script src="Terrain.js"></script>
+<script src="camera.js"></script>
 <script src="mp2.js"></script>
 <body onload="startup();">
  <canvas id="myGLCanvas" width="800" height="800"></canvas>

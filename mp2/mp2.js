@@ -14,39 +14,31 @@ var canvas;
 var shaderProgram;
 
 /** @global The Modelview matrix */
-var mvMatrix = mat4.create();
+var mvMatrix = glMatrix.mat4.create();
 
 /** @global The Projection matrix */
-var pMatrix = mat4.create();
+var pMatrix = glMatrix.mat4.create();
 
 /** @global The Normal matrix */
-var nMatrix = mat3.create();
+var nMatrix = glMatrix.mat3.create();
 
 /** @global The matrix stack for hierarchical modeling */
 var mvMatrixStack = [];
 
 /** @global The angle of rotation around the y axis */
-var viewRot = 10;
+var viewRot = 0;
 
 /** @global A glmatrix vector to use for transformations */
-var transformVec = vec3.create();
+var transformVec = glMatrix.vec3.create();
 
 // Initialize the vector....
-vec3.set(transformVec,0.0,0.0,-2.0);
+glMatrix.vec3.set(transformVec,0.0,0.0,-2.0);
 
 /** @global An object holding the geometry for a 3D terrain */
 var myTerrain;
 
-
-// View parameters
-/** @global Location of the camera in world coordinates */
-var eyePt = vec3.fromValues(0.0,0.0,-1);
-/** @global Direction of the view in world coordinates */
-var viewDir = vec3.fromValues(-0.1,-0.3,-1.0);
-/** @global Up vector for view matrix creation, in world coordinates */
-var up = vec3.fromValues(0.0,1.0,0.0);
-/** @global Location of a point along viewDir in world coordinates */
-var viewPt = vec3.fromValues(0.0,0.0,0.0);
+// Declare camera object;
+var camera = new Camera();
 
 //Light parameters
 /** @global Light position in VIEW coordinates */
@@ -73,7 +65,6 @@ var kEdgeBlack = [0.0,0.0,0.0];
 var kEdgeWhite = [1.0,1.0,1.0];
 
 
-
 //-------------------------------------------------------------------------
 /**
  * Sends Modelview matrix to shader
@@ -96,9 +87,9 @@ function uploadProjectionMatrixToShader() {
  * Generates and sends the normal matrix to the shader
  */
 function uploadNormalMatrixToShader() {
-  mat3.fromMat4(nMatrix,mvMatrix);
-  mat3.transpose(nMatrix,nMatrix);
-  mat3.invert(nMatrix,nMatrix);
+  glMatrix.mat3.fromMat4(nMatrix,mvMatrix);
+  glMatrix.mat3.transpose(nMatrix,nMatrix);
+  glMatrix.mat3.invert(nMatrix,nMatrix);
   gl.uniformMatrix3fv(shaderProgram.nMatrixUniform, false, nMatrix);
 }
 
@@ -107,7 +98,7 @@ function uploadNormalMatrixToShader() {
  * Pushes matrix onto modelview matrix stack
  */
 function mvPushMatrix() {
-    var copy = mat4.clone(mvMatrix);
+    var copy = glMatrix.mat4.clone(mvMatrix);
     mvMatrixStack.push(copy);
 }
 
@@ -287,7 +278,7 @@ function setLightUniforms(loc,a,d,s) {
  * Populate buffers with data
  */
 function setupBuffers() {
-    myTerrain = new Terrain(64,-0.5,0.5,-0.5,0.5);
+    myTerrain = new Terrain(256,-0.5,0.5,-0.5,0.5);
     myTerrain.loadBuffers();
 }
 
@@ -297,27 +288,25 @@ function setupBuffers() {
  */
 function draw() {
     //console.log("function draw()")
-    var transformVec = vec3.create();
+    var transformVec = glMatrix.vec3.create();
 
     gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     // We'll use perspective
-    mat4.perspective(pMatrix,degToRad(45),
+    glMatrix.mat4.perspective(pMatrix,degToRad(45),
                      gl.viewportWidth / gl.viewportHeight,
                      0.1, 200.0);
 
-    // We want to look down -z, so create a lookat point in that direction
-    vec3.add(viewPt, eyePt, viewDir);
-    // Then generate the lookat matrix and initialize the MV matrix to that view
-    mat4.lookAt(mvMatrix,eyePt,viewPt,up);
+    camera.rollAngle = 0;
+    camera.rotateCamera();
+    camera.pushViewMatrix();
 
-    //Draw Terrain
-    mvPushMatrix();
-    vec3.set(transformVec,0.0,-0.25,-2.0);
-    mat4.translate(mvMatrix, mvMatrix,transformVec);
-    mat4.rotateY(mvMatrix, mvMatrix, degToRad(viewRot));
-    mat4.rotateX(mvMatrix, mvMatrix, degToRad(-75));
+    glMatrix.vec3.set(transformVec,0.0,0.0,0.0);
+    glMatrix.mat4.translate(mvMatrix, mvMatrix,transformVec);
+    glMatrix.mat4.rotateX(mvMatrix, mvMatrix, degToRad(-90));
+    // glMatrix.vec3.set(transformVec,0.0,-.30,.1);
+    // glMatrix.mat4.translate(mvMatrix, mvMatrix,transformVec);
     setMatrixUniforms();
     setLightUniforms(lightPosition,lAmbient,lDiffuse,lSpecular);
 
