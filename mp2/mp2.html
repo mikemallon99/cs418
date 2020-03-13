@@ -59,6 +59,7 @@ uniform vec3 uKAmbient;
 uniform vec3 uKDiffuse;
 uniform vec3 uKSpecular;
 uniform float uShininess;
+uniform float uFogDensity;
 
 varying vec3 normalEye;
 varying vec3 vertexPositionEye3;
@@ -94,6 +95,19 @@ void main(void) {
         gl_FragColor = vec4(((uAmbientLightColor*uKAmbient)
                     + (diffuseColor*uKDiffuse) * diffuseLightWeightning
                     + ((uSpecularLightColor*uKSpecular) * specularLightWeightning)),1.0);
+
+        // Find the fog coordinate
+        float fogCoord = (gl_FragCoord.z/gl_FragCoord.w);
+
+        // Calculate the fog factor
+        float log2 = 1.442695;
+        float fogDensity = uFogDensity;
+        float fogFactor = exp2(-fogDensity*fogDensity*fogCoord*fogCoord*log2);
+        fogFactor = clamp(fogFactor, 0.0, 1.0);
+
+        // Adjust the fragment color based on the fog factor
+        vec4 fogColor = vec4(1.0,1.0,1.0,1.0);
+        gl_FragColor = mix(fogColor, gl_FragColor, fogFactor);
  }
 </script>
 
@@ -111,7 +125,24 @@ void main(void) {
          <input type="radio" name="primitive" id="polygon" id="polygon" value="polygon" checked> Polygon
          <input type="radio" name="primitive" id="wirepoly" value="wirepoly" > Polygon with Edges
         </fieldset>
-        </form>
+        <fieldset>
+            <legend>Fog Parameters</legend>
+         <input type="radio" name="primitive2" id="fogon" value="fogon" checked> Fog On
+         <input type="radio" name="primitive2" id="fogoff" value="fogoff"> Fog Off
+        </fieldset>
+    </form>
+    <br></br>
+    Greetings.
+    <br>
+    You can use the left/right arrow keys to control your roll.
+    <br>
+    The up/down arrow keys can be used to control your pitch.
+    <br>
+    Use the +/- keys to change your speed.
+    <br>
+    You can also disable the fog or change render settings using the checkboxes.
+    <br>
+    Lastly, remember to have fun and <b>fly safely</b>
 </body>
 
 </html>

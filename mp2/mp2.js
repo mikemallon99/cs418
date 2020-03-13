@@ -64,6 +64,25 @@ var kEdgeBlack = [0.0,0.0,0.0];
 /** @global Edge color for wireframe rendering */
 var kEdgeWhite = [1.0,1.0,1.0];
 
+// Fog parameters
+var fogDensityValue = 3.0;
+
+
+var currentlyPressedKeys = {};
+
+// Handle all relevant key presses
+function handleKeyDown(event) {
+  console.log("Key down ", event.key, " code ", event.code);
+  if (event.key == "ArrowDown" || event.key == "ArrowUp" || event.key == "ArrowLeft" || event.key == "ArrowRight" || event.key == "+" || event.key == "-")
+    event.preventDefault();
+  currentlyPressedKeys[event.key] = true;
+}
+
+// Indicates that a key has been released
+function handeKeyUp(event) {
+  console.log("Key up ", event.key, " code ", event.code);
+  currentlyPressedKeys[event.key] = false;
+}
 
 //-------------------------------------------------------------------------
 /**
@@ -237,6 +256,7 @@ function setupShaders() {
   shaderProgram.uniformAmbientLightColorLoc = gl.getUniformLocation(shaderProgram, "uAmbientLightColor");
   shaderProgram.uniformDiffuseLightColorLoc = gl.getUniformLocation(shaderProgram, "uDiffuseLightColor");
   shaderProgram.uniformSpecularLightColorLoc = gl.getUniformLocation(shaderProgram, "uSpecularLightColor");
+  shaderProgram.uniformFogDensityLoc = gl.getUniformLocation(shaderProgram, "uFogDensity");
   shaderProgram.uniformShininessLoc = gl.getUniformLocation(shaderProgram, "uShininess");
   shaderProgram.uniformAmbientMaterialColorLoc = gl.getUniformLocation(shaderProgram, "uKAmbient");
   shaderProgram.uniformDiffuseMaterialColorLoc = gl.getUniformLocation(shaderProgram, "uKDiffuse");
@@ -251,7 +271,8 @@ function setupShaders() {
  * @param {Float32Array} d Diffuse material color
  * @param {Float32Array} s Specular material color
  */
-function setMaterialUniforms(alpha,a,d,s) {
+function setMaterialUniforms(fog,alpha,a,d,s) {
+  gl.uniform1f(shaderProgram.uniformFogDensityLoc, fog);
   gl.uniform1f(shaderProgram.uniformShininessLoc, alpha);
   gl.uniform3fv(shaderProgram.uniformAmbientMaterialColorLoc, a);
   gl.uniform3fv(shaderProgram.uniformDiffuseMaterialColorLoc, d);
@@ -298,33 +319,43 @@ function draw() {
                      gl.viewportWidth / gl.viewportHeight,
                      0.1, 200.0);
 
-    camera.rollAngle = 0;
-    camera.rotateCamera();
+    // Update the camera based on the input values
+    camera.updateCamera();
+    // Adjust light position based on camera mvMatrix
+    let viewLightPos = glMatrix.vec3.fromValues(0.0,0.0,0.0);
+    glMatrix.vec3.transformMat4(viewLightPos, lightPosition, mvMatrix);
     camera.pushViewMatrix();
 
-    glMatrix.vec3.set(transformVec,0.0,0.0,0.0);
-    glMatrix.mat4.translate(mvMatrix, mvMatrix,transformVec);
+
     glMatrix.mat4.rotateX(mvMatrix, mvMatrix, degToRad(-90));
     // glMatrix.vec3.set(transformVec,0.0,-.30,.1);
     // glMatrix.mat4.translate(mvMatrix, mvMatrix,transformVec);
     setMatrixUniforms();
-    setLightUniforms(lightPosition,lAmbient,lDiffuse,lSpecular);
+    setLightUniforms(viewLightPos,lAmbient,lDiffuse,lSpecular);
+
+    // Handle setting the fog
+    if ((document.getElementById("fogon").checked)) {
+      fogDensityValue = 3.0;
+    }
+    else {
+      fogDensityValue = 0.0
+    }
 
     if ((document.getElementById("polygon").checked) || (document.getElementById("wirepoly").checked))
     {
-      setMaterialUniforms(shininess,kAmbient,kTerrainDiffuse,kSpecular);
+      setMaterialUniforms(fogDensityValue,shininess,kAmbient,kTerrainDiffuse,kSpecular);
       myTerrain.drawTriangles();
     }
 
     if(document.getElementById("wirepoly").checked)
     {
-      setMaterialUniforms(shininess,kAmbient,kEdgeBlack,kSpecular);
+      setMaterialUniforms(fogDensityValue,shininess,kAmbient,kEdgeBlack,kSpecular);
       myTerrain.drawEdges();
     }
 
     if(document.getElementById("wireframe").checked)
     {
-      setMaterialUniforms(shininess,kAmbient,kEdgeWhite,kSpecular);
+      setMaterialUniforms(fogDensityValue,shininess,kAmbient,kEdgeWhite,kSpecular);
       myTerrain.drawEdges();
     }
     mvPopMatrix();
@@ -338,6 +369,8 @@ function draw() {
  */
  function startup() {
   canvas = document.getElementById("myGLCanvas");
+  document.onkeydown = handleKeyDown;
+  document.onkeyup = handeKeyUp;
   gl = createGLContext(canvas);
   setupShaders();
   setupBuffers();
@@ -352,5 +385,24 @@ function draw() {
  */
 function tick() {
     requestAnimFrame(tick);
+    animate();
     draw();
+}
+
+// This animate function contains all the input handlers
+function animate() {
+  if(currentlyPressedKeys["ArrowUp"])
+    camera.pitchAngle += 0.2;
+  if(currentlyPressedKeys["ArrowDown"])
+    camera.pitchAngle -= 0.2;
+  if(currentlyPressedKeys["ArrowRight"])
+    camera.rollAngle += 0.3;
+  if(currentlyPressedKeys["ArrowLeft"])
+    camera.rollAngle -= 0.3;
+  if(currentlyPressedKeys["+"])
+    camera.speed += 0.0001;
+  if(currentlyPressedKeys["-"]) {
+    camera.speed -= 0.0001;
+    if (camera.speed < 0) camera.speed = 0.0;
+  }
 }
