@@ -34,7 +34,7 @@ class Terrain{
         console.log("Terrain: Generated triangles");
 
         // This generates all of the topology
-        this.generateTerrain(.005, 100);
+        this.generateTerrain(.0015, 500);
         console.log("Terrain: Generated random terrain");
 
         this.generateLines();
@@ -235,14 +235,14 @@ generateTriangles()
 dotProduct(a,p,n)
 {
   // A~ vector
-  let vecA = [0,0];
+  let vecA = [0.0,0.0];
   vecA[0] = a[0] - p[0];
   vecA[1] = a[1] - p[1];
 
   // N~ vector
-  let vecN = [0,0];
-  vecN[0] = n[0] - p[0];
-  vecN[1] = n[1] - p[1];
+  let vecN = [0.0,0.0];
+  vecN[0] = n[0];
+  vecN[1] = n[1];
 
   let result = vecA[0]*vecN[0] + vecA[1]*vecN[1];
   return result;
@@ -265,9 +265,9 @@ randomizeTerrainVerts(delta, iterations)
   let neg = 0;
   for(var k=0; k<iterations; k++) {
     // This is a random point on the square
-    var p = [0,0];
+    var p = [0.0,0.0];
     // This is our normal vector
-    var n = [0,0];
+    var n = [0.0,0.0];
 
     // Randomize values
     p[0] = Math.random()*(this.maxX-this.minX)+this.minX;

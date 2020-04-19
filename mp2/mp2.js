@@ -14,39 +14,31 @@ var canvas;
 var shaderProgram;
 
 /** @global The Modelview matrix */
-var mvMatrix = mat4.create();
+var mvMatrix = glMatrix.mat4.create();
 
 /** @global The Projection matrix */
-var pMatrix = mat4.create();
+var pMatrix = glMatrix.mat4.create();
 
 /** @global The Normal matrix */
-var nMatrix = mat3.create();
+var nMatrix = glMatrix.mat3.create();
 
 /** @global The matrix stack for hierarchical modeling */
 var mvMatrixStack = [];
 
 /** @global The angle of rotation around the y axis */
-var viewRot = 10;
+var viewRot = 0;
 
 /** @global A glmatrix vector to use for transformations */
-var transformVec = vec3.create();
+var transformVec = glMatrix.vec3.create();
 
 // Initialize the vector....
-vec3.set(transformVec,0.0,0.0,-2.0);
+glMatrix.vec3.set(transformVec,0.0,0.0,-2.0);
 
 /** @global An object holding the geometry for a 3D terrain */
 var myTerrain;
 
-
-// View parameters
-/** @global Location of the camera in world coordinates */
-var eyePt = vec3.fromValues(0.0,0.0,-1);
-/** @global Direction of the view in world coordinates */
-var viewDir = vec3.fromValues(-0.1,-0.3,-1.0);
-/** @global Up vector for view matrix creation, in world coordinates */
-var up = vec3.fromValues(0.0,1.0,0.0);
-/** @global Location of a point along viewDir in world coordinates */
-var viewPt = vec3.fromValues(0.0,0.0,0.0);
+// Declare camera object;
+var camera = new Camera();
 
 //Light parameters
 /** @global Light position in VIEW coordinates */
@@ -72,7 +64,25 @@ var kEdgeBlack = [0.0,0.0,0.0];
 /** @global Edge color for wireframe rendering */
 var kEdgeWhite = [1.0,1.0,1.0];
 
+// Fog parameters
+var fogDensityValue = 3.0;
 
+
+var currentlyPressedKeys = {};
+
+// Handle all relevant key presses
+function handleKeyDown(event) {
+  console.log("Key down ", event.key, " code ", event.code);
+  if (event.key == "ArrowDown" || event.key == "ArrowUp" || event.key == "ArrowLeft" || event.key == "ArrowRight" || event.key == "+" || event.key == "-")
+    event.preventDefault();
+  currentlyPressedKeys[event.key] = true;
+}
+
+// Indicates that a key has been released
+function handeKeyUp(event) {
+  console.log("Key up ", event.key, " code ", event.code);
+  currentlyPressedKeys[event.key] = false;
+}
 
 //-------------------------------------------------------------------------
 /**
@@ -96,9 +106,9 @@ function uploadProjectionMatrixToShader() {
  * Generates and sends the normal matrix to the shader
  */
 function uploadNormalMatrixToShader() {
-  mat3.fromMat4(nMatrix,mvMatrix);
-  mat3.transpose(nMatrix,nMatrix);
-  mat3.invert(nMatrix,nMatrix);
+  glMatrix.mat3.fromMat4(nMatrix,mvMatrix);
+  glMatrix.mat3.transpose(nMatrix,nMatrix);
+  glMatrix.mat3.invert(nMatrix,nMatrix);
   gl.uniformMatrix3fv(shaderProgram.nMatrixUniform, false, nMatrix);
 }
 
@@ -107,7 +117,7 @@ function uploadNormalMatrixToShader() {
  * Pushes matrix onto modelview matrix stack
  */
 function mvPushMatrix() {
-    var copy = mat4.clone(mvMatrix);
+    var copy = glMatrix.mat4.clone(mvMatrix);
     mvMatrixStack.push(copy);
 }
 
@@ -246,6 +256,7 @@ function setupShaders() {
   shaderProgram.uniformAmbientLightColorLoc = gl.getUniformLocation(shaderProgram, "uAmbientLightColor");
   shaderProgram.uniformDiffuseLightColorLoc = gl.getUniformLocation(shaderProgram, "uDiffuseLightColor");
   shaderProgram.uniformSpecularLightColorLoc = gl.getUniformLocation(shaderProgram, "uSpecularLightColor");
+  shaderProgram.uniformFogDensityLoc = gl.getUniformLocation(shaderProgram, "uFogDensity");
   shaderProgram.uniformShininessLoc = gl.getUniformLocation(shaderProgram, "uShininess");
   shaderProgram.uniformAmbientMaterialColorLoc = gl.getUniformLocation(shaderProgram, "uKAmbient");
   shaderProgram.uniformDiffuseMaterialColorLoc = gl.getUniformLocation(shaderProgram, "uKDiffuse");
@@ -260,7 +271,8 @@ function setupShaders() {
  * @param {Float32Array} d Diffuse material color
  * @param {Float32Array} s Specular material color
  */
-function setMaterialUniforms(alpha,a,d,s) {
+function setMaterialUniforms(fog,alpha,a,d,s) {
+  gl.uniform1f(shaderProgram.uniformFogDensityLoc, fog);
   gl.uniform1f(shaderProgram.uniformShininessLoc, alpha);
   gl.uniform3fv(shaderProgram.uniformAmbientMaterialColorLoc, a);
   gl.uniform3fv(shaderProgram.uniformDiffuseMaterialColorLoc, d);
@@ -287,7 +299,7 @@ function setLightUniforms(loc,a,d,s) {
  * Populate buffers with data
  */
 function setupBuffers() {
-    myTerrain = new Terrain(64,-0.5,0.5,-0.5,0.5);
+    myTerrain = new Terrain(256,-0.5,0.5,-0.5,0.5);
     myTerrain.loadBuffers();
 }
 
@@ -297,45 +309,53 @@ function setupBuffers() {
  */
 function draw() {
     //console.log("function draw()")
-    var transformVec = vec3.create();
+    var transformVec = glMatrix.vec3.create();
 
     gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     // We'll use perspective
-    mat4.perspective(pMatrix,degToRad(45),
+    glMatrix.mat4.perspective(pMatrix,degToRad(45),
                      gl.viewportWidth / gl.viewportHeight,
                      0.1, 200.0);
 
-    // We want to look down -z, so create a lookat point in that direction
-    vec3.add(viewPt, eyePt, viewDir);
-    // Then generate the lookat matrix and initialize the MV matrix to that view
-    mat4.lookAt(mvMatrix,eyePt,viewPt,up);
+    // Update the camera based on the input values
+    camera.updateCamera();
+    // Adjust light position based on camera mvMatrix
+    let viewLightPos = glMatrix.vec3.fromValues(0.0,0.0,0.0);
+    glMatrix.vec3.transformMat4(viewLightPos, lightPosition, mvMatrix);
+    camera.pushViewMatrix();
 
-    //Draw Terrain
-    mvPushMatrix();
-    vec3.set(transformVec,0.0,-0.25,-2.0);
-    mat4.translate(mvMatrix, mvMatrix,transformVec);
-    mat4.rotateY(mvMatrix, mvMatrix, degToRad(viewRot));
-    mat4.rotateX(mvMatrix, mvMatrix, degToRad(-75));
+
+    glMatrix.mat4.rotateX(mvMatrix, mvMatrix, degToRad(-90));
+    // glMatrix.vec3.set(transformVec,0.0,-.30,.1);
+    // glMatrix.mat4.translate(mvMatrix, mvMatrix,transformVec);
     setMatrixUniforms();
-    setLightUniforms(lightPosition,lAmbient,lDiffuse,lSpecular);
+    setLightUniforms(viewLightPos,lAmbient,lDiffuse,lSpecular);
+
+    // Handle setting the fog
+    if ((document.getElementById("fogon").checked)) {
+      fogDensityValue = 3.0;
+    }
+    else {
+      fogDensityValue = 0.0
+    }
 
     if ((document.getElementById("polygon").checked) || (document.getElementById("wirepoly").checked))
     {
-      setMaterialUniforms(shininess,kAmbient,kTerrainDiffuse,kSpecular);
+      setMaterialUniforms(fogDensityValue,shininess,kAmbient,kTerrainDiffuse,kSpecular);
       myTerrain.drawTriangles();
     }
 
     if(document.getElementById("wirepoly").checked)
     {
-      setMaterialUniforms(shininess,kAmbient,kEdgeBlack,kSpecular);
+      setMaterialUniforms(fogDensityValue,shininess,kAmbient,kEdgeBlack,kSpecular);
       myTerrain.drawEdges();
     }
 
     if(document.getElementById("wireframe").checked)
     {
-      setMaterialUniforms(shininess,kAmbient,kEdgeWhite,kSpecular);
+      setMaterialUniforms(fogDensityValue,shininess,kAmbient,kEdgeWhite,kSpecular);
       myTerrain.drawEdges();
     }
     mvPopMatrix();
@@ -349,6 +369,8 @@ function draw() {
  */
  function startup() {
   canvas = document.getElementById("myGLCanvas");
+  document.onkeydown = handleKeyDown;
+  document.onkeyup = handeKeyUp;
   gl = createGLContext(canvas);
   setupShaders();
   setupBuffers();
@@ -363,5 +385,24 @@ function draw() {
  */
 function tick() {
     requestAnimFrame(tick);
+    animate();
     draw();
+}
+
+// This animate function contains all the input handlers
+function animate() {
+  if(currentlyPressedKeys["ArrowUp"])
+    camera.pitchAngle += 0.2;
+  if(currentlyPressedKeys["ArrowDown"])
+    camera.pitchAngle -= 0.2;
+  if(currentlyPressedKeys["ArrowRight"])
+    camera.rollAngle += 0.3;
+  if(currentlyPressedKeys["ArrowLeft"])
+    camera.rollAngle -= 0.3;
+  if(currentlyPressedKeys["+"])
+    camera.speed += 0.0001;
+  if(currentlyPressedKeys["-"]) {
+    camera.speed -= 0.0001;
+    if (camera.speed < 0) camera.speed = 0.0;
+  }
 }
